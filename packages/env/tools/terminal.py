@@ -1,5 +1,6 @@
 """Terminal management via tmux (replaces terminalServer + ht binary)."""
 
+import os
 import logging
 from typing import Optional
 
@@ -9,8 +10,24 @@ log = logging.getLogger(__name__)
 
 SESSION_NAME = "headlong"
 
+# Env vars from .env that should NOT leak into tmux child processes.
+_SENSITIVE_ENV_VARS = [
+    "ANTHROPIC_API_KEY", "OPENAI_API_KEY", "OPENAI_ORG", "OPENROUTER_API_KEY",
+    "SUPABASE_ANON_KEY_HEADLONG", "SUPABASE_SERVICE_ROLE_KEY_HEADLONG",
+    "SUPABASE_ID_HEADLONG", "SUPABASE_URL_HEADLONG", "SUPABASE_DB_URL",
+    "AGENT_REPL_DB_URL", "PINECONE_API_KEY", "SERPAPI_API_KEY", "NEWS_API_KEY",
+    "TELEGRAM_BOT_TOKEN", "TELEGRAM_CHAT_ID",
+    "TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN", "TWILIO_PHONE_NUMBER",
+    "HF_API_KEY", "HF_LLAMA_ENDPOINT",
+]
+
 _server: Optional[libtmux.Server] = None
 _session: Optional[libtmux.Session] = None
+
+
+def _unset_env_cmd() -> str:
+    """Build a shell command that unsets sensitive env vars."""
+    return "; ".join(f"unset {v}" for v in _SENSITIVE_ENV_VARS if os.environ.get(v))
 
 
 def get_session() -> libtmux.Session:
@@ -34,8 +51,12 @@ def get_session() -> libtmux.Session:
     except Exception:
         pass
 
-    # Create new session
+    # Create new session and unset sensitive env vars in the initial window
     _session = _server.new_session(session_name=SESSION_NAME)
+    unset_cmd = _unset_env_cmd()
+    if unset_cmd:
+        pane = _session.active_window.active_pane
+        pane.send_keys(unset_cmd, enter=True)
     log.info("created new tmux session: %s", SESSION_NAME)
     return _session
 
@@ -50,6 +71,11 @@ async def new_window(args: dict) -> str:
         window_name=window_id,
         window_shell=shell_path,
     )
+    # Unset sensitive env vars so child processes don't inherit them
+    unset_cmd = _unset_env_cmd()
+    if unset_cmd:
+        pane = window.active_pane
+        pane.send_keys(unset_cmd, enter=True)
     log.info("created new window: %s", window_id)
     return f"observation: created new terminal window '{window_id}'"
 
