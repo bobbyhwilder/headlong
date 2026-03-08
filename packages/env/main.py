@@ -69,6 +69,7 @@ async def embed_thought(thought: dict) -> None:
 
 
 _handled_ids: set[str] = set()
+_handled_lock = asyncio.Lock()
 _embedded_ids: set[str] = set()
 
 async def handle_thought(thought: dict, agent_name: str) -> None:
@@ -94,9 +95,11 @@ async def handle_thought(thought: dict, agent_name: str) -> None:
     thought_id = thought.get("id")
 
     # Dedup: Realtime can deliver the same thought multiple times
-    if thought_id in _handled_ids:
-        return
-    _handled_ids.add(thought_id)
+    # (INSERT + UPDATE events). Use a lock to prevent race conditions.
+    async with _handled_lock:
+        if thought_id in _handled_ids:
+            return
+        _handled_ids.add(thought_id)
 
     thought_index = thought.get("index", 0)
     log.info(

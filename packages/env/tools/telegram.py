@@ -34,6 +34,7 @@ async def execute(args: dict) -> str:
 
 
 _app: Optional[telegram.ext.Application] = None
+_seen_message_ids: set[int] = set()
 
 
 async def start_listener(on_message: Callable[[str, str], Awaitable[None]]):
@@ -52,6 +53,12 @@ async def start_listener(on_message: Callable[[str, str], Awaitable[None]]):
 
     async def handle_message(update: telegram.Update, context):
         if update.message and update.message.text:
+            # Dedup: telegram can deliver the same message twice
+            if update.message.message_id in _seen_message_ids:
+                log.debug("skipping duplicate telegram message_id=%s", update.message.message_id)
+                return
+            _seen_message_ids.add(update.message.message_id)
+
             chat_id = str(update.message.chat_id)
             text = update.message.text
             sender = update.message.from_user
