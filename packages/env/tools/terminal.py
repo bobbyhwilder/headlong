@@ -19,6 +19,8 @@ _SENSITIVE_ENV_VARS = [
     "TELEGRAM_BOT_TOKEN", "TELEGRAM_CHAT_ID",
     "TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN", "TWILIO_PHONE_NUMBER",
     "HF_API_KEY", "HF_LLAMA_ENDPOINT",
+    # CLAUDECODE prevents Claude Code from launching (thinks it's nested)
+    "CLAUDECODE",
 ]
 
 _server: Optional[libtmux.Server] = None
